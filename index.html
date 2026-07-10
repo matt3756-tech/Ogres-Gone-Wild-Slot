@@ -1,0 +1,1151 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Ogres Gone Wild - Slot Machine</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            user-select: none;
+            -webkit-user-select: none;
+        }
+        body {
+            background-color: #1a120b;
+            color: #f5efe6;
+            font-family: 'Georgia', serif;
+            margin: 0;
+            padding: 10px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+        }
+        .game-container {
+            display: flex;
+            flex-direction: row;
+            flex-wrap: wrap;
+            gap: 20px;
+            background: linear-gradient(135deg, #2c1e13, #1c130b);
+            padding: 15px;
+            border-radius: 16px;
+            box-shadow: 0 15px 35px rgba(0,0,0,0.8), inset 0 0 20px rgba(0,0,0,0.6);
+            border: 4px solid #3d2a1c;
+            max-width: 1350px;
+            width: 100%;
+            justify-content: center;
+            align-items: flex-start;
+        }
+        .slot-machine-wrapper {
+            position: relative;
+            width: 100%;
+            max-width: 900px;
+            aspect-ratio: 900 / 600;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.5);
+            border-radius: 8px;
+            overflow: hidden;
+            background-color: #fff; 
+        }
+        canvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+        }
+        .ui-btn {
+            position: absolute;
+            cursor: pointer;
+            border: none;
+            background: rgba(255, 0, 0, 0); /* Visible bounds helper if adjusted */
+            outline: none;
+            -webkit-tap-highlight-color: transparent;
+            z-index: 10;
+        }
+        
+        /* Percent-based layout mappings targeting original layout design */
+        #btn-spin {
+            bottom: 1.83%;
+            right: 7.55%;
+            width: 23.11%;
+            height: 15.66%;
+            border-radius: 20px;
+        }
+        #btn-bet-down {
+            bottom: 3.5%;
+            left: 37.33%;
+            width: 5.55%;
+            height: 8.66%;
+            border-radius: 10px;
+        }
+        #btn-bet-up {
+            bottom: 3.5%;
+            left: 59.22%;
+            width: 5.55%;
+            height: 8.66%;
+            border-radius: 10px;
+        }
+        
+        .pay-table {
+            background: rgba(15, 10, 5, 0.85);
+            border: 3px solid #d4af37;
+            border-radius: 12px;
+            padding: 20px;
+            width: 100%;
+            max-width: 380px;
+            box-shadow: inset 0 0 15px rgba(0,0,0,0.5);
+        }
+        .pay-table h2 {
+            text-align: center;
+            color: #d4af37;
+            margin-top: 0;
+            margin-bottom: 15px;
+            font-size: 24px;
+            letter-spacing: 2px;
+            text-transform: uppercase;
+            border-bottom: 2px solid #3d2a1c;
+            padding-bottom: 10px;
+        }
+        .pay-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 8px 0;
+            border-bottom: 1px solid rgba(212, 175, 55, 0.2);
+        }
+        .pay-row:last-child {
+            border-bottom: none;
+        }
+        .pay-symbol-info {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+        .pay-thumb {
+            width: 35px;
+            height: 35px;
+            border-radius: 4px;
+            border: 1px solid #5c4028;
+            background-color: #fff;
+            object-fit: cover;
+        }
+        .pay-name {
+            font-weight: bold;
+            font-size: 16px;
+        }
+        .pay-val {
+            color: #d4af37;
+            font-weight: bold;
+            font-size: 18px;
+        }
+        .wild-note {
+            margin-top: 15px;
+            background: rgba(212, 175, 55, 0.1);
+            border: 1px solid #d4af37;
+            padding: 10px;
+            border-radius: 6px;
+            font-size: 13px;
+            line-height: 1.4;
+            color: #ffdd6b;
+            text-align: center;
+        }
+
+        /* --- Popups Mobile Scaled --- */
+        .credits-overlay, .bigwin-overlay, .respin-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.85);
+            z-index: 100;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.4s ease;
+        }
+        .bigwin-overlay, .respin-overlay {
+            background: rgba(0, 0, 0, 0.4);
+            backdrop-filter: blur(3px);
+            z-index: 150;
+        }
+        .respin-overlay { z-index: 160; }
+        
+        .credits-overlay.active, .bigwin-overlay.active, .respin-overlay.active {
+            opacity: 1;
+            pointer-events: auto;
+        }
+        
+        .credits-popup, .bigwin-popup, .respin-popup {
+            background: linear-gradient(135deg, #3d2a1c, #1a120b);
+            border: 4px solid #d4af37;
+            box-shadow: 0 0 30px rgba(212, 175, 55, 0.4), inset 0 0 15px rgba(0,0,0,0.6);
+            border-radius: 16px;
+            width: 90%;
+            max-width: 500px;
+            padding: 25px;
+            text-align: center;
+            transform: scale(0.85);
+            transition: transform 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        }
+        .bigwin-popup {
+            background: radial-gradient(circle, #ffe359 0%, #b8860b 70%, #543d00 100%);
+            border: 6px solid #fff;
+            outline: 4px solid #b8860b;
+            box-shadow: 0 0 50px rgba(255, 215, 0, 0.8), inset 0 0 30px rgba(0,0,0,0.4);
+        }
+        .respin-popup {
+            background: radial-gradient(circle, #a3e635 0%, #65a30d 70%, #3f6212 100%);
+            border: 6px solid #fff;
+            outline: 4px solid #65a30d;
+            box-shadow: 0 0 50px rgba(163, 230, 53, 0.8), inset 0 0 30px rgba(0,0,0,0.4);
+        }
+
+        .credits-overlay.active .credits-popup,
+        .bigwin-overlay.active .bigwin-popup,
+        .respin-overlay.active .respin-popup {
+            transform: scale(1);
+        }
+        
+        .popup-title {
+            color: #ff4a4a;
+            font-size: 6vw;
+            max-font-size: 32px;
+            font-weight: 900;
+            margin: 0 0 15px 0;
+            text-transform: uppercase;
+        }
+        @media(min-width: 500px){ .popup-title { font-size: 32px; } }
+
+        .popup-message {
+            color: #f5efe6;
+            font-size: 16px;
+            line-height: 1.5;
+            margin: 0 0 25px 0;
+            font-weight: bold;
+        }
+        .popup-btn {
+            background: linear-gradient(180deg, #ffd700, #b8860b);
+            border: 2px solid #fff;
+            color: #1a120b;
+            font-family: sans-serif;
+            font-size: 16px;
+            font-weight: bold;
+            text-transform: uppercase;
+            padding: 12px 28px;
+            border-radius: 30px;
+            cursor: pointer;
+        }
+        
+        .bigwin-header, .respin-header {
+            color: #ffffff;
+            font-family: 'Impact', 'Arial Black', sans-serif;
+            font-size: 10vw;
+            letter-spacing: 2px;
+            margin: 0;
+            text-transform: uppercase;
+            text-shadow: -2px -2px 0 #000, 2px -2px 0 #000, -2px 2px 0 #000, 2px 2px 0 #000;
+            animation: pulse 0.5s ease-in-out infinite alternate;
+        }
+        @media(min-width: 600px){ 
+            .bigwin-header { font-size: 64px; } 
+            .respin-header { font-size: 54px; }
+        }
+        
+        .bigwin-credits {
+            color: #fffb00;
+            font-family: 'Arial Black', sans-serif;
+            font-size: 8vw;
+            margin: 15px 0 0 0;
+            text-shadow: -2px -2px 0 #000, 2px -2px 0 #000, -2px 2px 0 #000, 2px 2px 0 #000;
+        }
+        @media(min-width: 600px){ .bigwin-credits { font-size: 48px; } }
+
+        @keyframes pulse {
+            from { transform: scale(1); }
+            to { transform: scale(1.06); }
+        }
+
+
+        .leaderboard-panel {
+            margin-top: 18px;
+            padding-top: 16px;
+            border-top: 2px solid #3d2a1c;
+        }
+        .cashout-btn {
+            width: 100%;
+            margin-bottom: 14px;
+            background: linear-gradient(180deg, #8ee36b, #3f8f2f);
+            border: 2px solid #d7ffca;
+            color: #10210b;
+            font-family: sans-serif;
+            font-weight: 900;
+            font-size: 18px;
+            text-transform: uppercase;
+            padding: 12px 16px;
+            border-radius: 10px;
+            cursor: pointer;
+            box-shadow: 0 4px 0 #25571c;
+        }
+        .cashout-btn:disabled { opacity: .55; cursor: not-allowed; }
+        .leaderboard-panel h3 {
+            color: #d4af37;
+            text-align: center;
+            margin: 0 0 10px;
+            font-family: sans-serif;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+        .leaderboard-status {
+            min-height: 20px;
+            margin: 8px 0;
+            text-align: center;
+            font-family: sans-serif;
+            font-size: 13px;
+            color: #ffdd6b;
+        }
+        .leaderboard-list { font-family: sans-serif; }
+        .leaderboard-entry {
+            display: grid;
+            grid-template-columns: 34px 1fr auto;
+            gap: 8px;
+            align-items: center;
+            padding: 8px 6px;
+            border-bottom: 1px solid rgba(212,175,55,.2);
+        }
+        .leaderboard-rank { color: #d4af37; font-weight: 900; }
+        .leaderboard-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .leaderboard-score { font-weight: 900; color: #8ee36b; }
+        .cashout-overlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,.88);
+            z-index: 300;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+        .cashout-overlay.active { display: flex; }
+        .cashout-dialog {
+            width: min(460px, 100%);
+            background: linear-gradient(135deg, #3d2a1c, #1a120b);
+            border: 4px solid #d4af37;
+            border-radius: 16px;
+            padding: 24px;
+            text-align: center;
+            box-shadow: 0 0 35px rgba(212,175,55,.35);
+        }
+        .cashout-dialog h2 { color: #d4af37; margin-top: 0; }
+        .cashout-dialog input {
+            width: 100%;
+            padding: 12px;
+            border-radius: 8px;
+            border: 2px solid #d4af37;
+            font-size: 18px;
+            margin: 10px 0 14px;
+            user-select: text;
+            -webkit-user-select: text;
+        }
+        .cashout-actions { display: flex; gap: 10px; justify-content: center; }
+        .cashout-actions button {
+            flex: 1;
+            padding: 11px;
+            border-radius: 8px;
+            border: none;
+            font-weight: 900;
+            cursor: pointer;
+        }
+        #btn-submit-cashout { background: #d4af37; color: #1a120b; }
+        #btn-cancel-cashout { background: #5c4028; color: white; }
+
+        /* Tablet & Mobile Layout Shifts */
+        @media (max-width: 900px) {
+            .game-container {
+                flex-direction: column;
+                align-items: center;
+            }
+            .pay-table {
+                max-width: 100%;
+            }
+        }
+    </style>
+</head>
+<body>
+
+<div class="game-container">
+    <div class="slot-machine-wrapper">
+        <canvas id="slotCanvas" width="900" height="600"></canvas>
+        <button class="ui-btn" id="btn-bet-down" title="Decrease Bet"></button>
+        <button class="ui-btn" id="btn-bet-up" title="Increase Bet"></button>
+        <button class="ui-btn" id="btn-spin" title="Spin Reels!"></button>
+
+        <div class="credits-overlay" id="creditsOverlay">
+            <div class="credits-popup">
+                <h3 class="popup-title">Out of Credits!</h3>
+                <p class="popup-message">USE YOUR PARENT'S MONEY TO BUY MORE!</p>
+                <button class="popup-btn" id="btn-get-credits">Get More Credits</button>
+            </div>
+        </div>
+
+        <div class="bigwin-overlay" id="bigwinOverlay">
+            <div class="bigwin-popup">
+                <h2 class="bigwin-header">BIG WIN!</h2>
+                <div class="bigwin-credits" id="bigwinDisplayAmount">+0</div>
+            </div>
+        </div>
+
+        <div class="respin-overlay" id="respinOverlay">
+            <div class="respin-popup">
+                <h2 class="respin-header">OGRE RESPIN!!!</h2>
+            </div>
+        </div>
+    </div>
+
+    <div class="pay-table">
+        <h2>Pay Table</h2>
+        <div class="pay-row">
+            <div class="pay-symbol-info"><img class="pay-thumb" src="./ogre.jpg" alt="Ogre"> <span class="pay-name">3x Ogre Jackpot</span></div>
+            <div class="pay-val">1500X</div>
+        </div>
+        <div class="pay-row">
+            <div class="pay-symbol-info"><img class="pay-thumb" src="./truck.jpg" alt="Truck"> <span class="pay-name">3x Truck</span></div>
+            <div class="pay-val">50X</div>
+        </div>
+        <div class="pay-row">
+            <div class="pay-symbol-info"><img class="pay-thumb" src="./beer.jpg" alt="Beer"> <span class="pay-name">3x Beer</span></div>
+            <div class="pay-val">35X</div>
+        </div>
+        <div class="pay-row">
+            <div class="pay-symbol-info"><img class="pay-thumb" src="./chew.jpg" alt="Chew"> <span class="pay-name">3x Chew</span></div>
+            <div class="pay-val">25X</div>
+        </div>
+        <div class="pay-row">
+            <div class="pay-symbol-info"><img class="pay-thumb" src="./cigs.jpg" alt="Cigs"> <span class="pay-name">3x Cigs</span></div>
+            <div class="pay-val">20X</div>
+        </div>
+        <div class="pay-row">
+            <div class="pay-symbol-info"><img class="pay-thumb" src="./shirt.jpg" alt="Shirt"> <span class="pay-name">3x Shirt</span></div>
+            <div class="pay-val">15X</div>
+        </div>
+        <div class="pay-row">
+            <div class="pay-symbol-info"><img class="pay-thumb" src="./A.jpg" alt="A"> <span class="pay-name">3x Ace</span></div>
+            <div class="pay-val">10X</div>
+        </div>
+        <div class="pay-row">
+            <div class="pay-symbol-info"><img class="pay-thumb" src="./K.jpg" alt="K"> <span class="pay-name">3x King</span></div>
+            <div class="pay-val">5X</div>
+        </div>
+        <div class="wild-note">
+            <strong>Ogre is WILD!</strong><br>
+            1 Ogre in a win multiplies pay by <strong>2X</strong>.<br>
+            2 Ogres in a win multiply pay by <strong>4X</strong>!<br>
+			<strong>RESPIN FEATURE: WHEN AN OGRE LANDS ON THE LEFT REEL, A RESPIN IS TRIGGERED!</strong>
+        </div>
+
+        <div class="leaderboard-panel">
+            <button class="cashout-btn" id="btn-cashout">Cash Out & Submit Score</button>
+            <h3>Global Leaderboard</h3>
+            <div class="leaderboard-status" id="leaderboardStatus">Loading scores...</div>
+            <div class="leaderboard-list" id="leaderboardList"></div>
+        </div>
+    </div>
+</div>
+
+<div class="cashout-overlay" id="cashoutOverlay">
+    <div class="cashout-dialog">
+        <h2>Submit Cashout</h2>
+        <p>You are cashing out <strong id="cashoutCredits">0</strong> credits.</p>
+        <input id="cashoutName" type="text" maxlength="24" placeholder="Enter leaderboard name" autocomplete="nickname">
+        <div class="cashout-actions">
+            <button id="btn-cancel-cashout">Cancel</button>
+            <button id="btn-submit-cashout">Submit</button>
+        </div>
+        <div class="leaderboard-status" id="cashoutStatus"></div>
+    </div>
+</div>
+
+<script>
+    // --- Audio Configuration ---
+    const AudioEngine = {
+        ctx: null,
+        spinAudio: null,
+        init() {
+            if (!this.ctx) {
+                this.ctx = new (window.AudioContext || window.webkitAudioContext)();
+            }
+            if (this.ctx && this.ctx.state === 'suspended') {
+                this.ctx.resume();
+            }
+        },
+        playClick() {
+            this.init();
+            let clickSound = new Audio('click.mp3');
+            clickSound.volume = 0.6;
+            clickSound.play().catch(err => console.log("Click sound issue:", err));
+        },
+        playSpin() {
+            this.init();
+            if (!this.spinAudio) {
+                this.spinAudio = new Audio('spin.mp3');
+                this.spinAudio.loop = true;
+            }
+            this.spinAudio.volume = 0.5;
+            this.spinAudio.currentTime = 0;
+            this.spinAudio.play().catch(err => {
+                console.log("Spin sound playback issue:", err);
+            });
+        },
+        stopSpin() {
+            if (this.spinAudio) {
+                this.spinAudio.pause();
+                this.spinAudio.currentTime = 0;
+            }
+        },
+        playStop() {
+            this.init();
+            let sound = new Audio('reelstop.mp3');
+            sound.volume = 0.4;
+            sound.play().catch(err => {
+                console.log("Reelstop sound playback issue:", err);
+            });
+        },
+        playOgreLanded() {
+            this.init();
+            let sound = new Audio('manchild.mp3');
+            sound.volume = 0.6;
+            sound.play().catch(err => {
+                console.log("Ogre sound playback issue:", err);
+            });
+        },
+        playRespin() {
+            this.init();
+            let sound = new Audio('respin.mp3');
+            sound.volume = 0.75;
+            sound.play().catch(err => {
+                console.log("Respin sound playback issue:", err);
+            });
+        },
+        playBigWin() {
+            this.init();
+            let sound = new Audio('bigwin.mp3');
+            sound.volume = 0.75;
+            sound.play().catch(err => {
+                console.log("Big win sound playback issue:", err);
+            });
+        },
+        playWin() {
+            this.init();
+            let now = this.ctx.currentTime;
+            let notes = [261.63, 329.63, 392.00, 523.25, 659.25, 783.99, 1046.50];
+            notes.forEach((freq, idx) => {
+                let osc = this.ctx.createOscillator();
+                let gain = this.ctx.createGain();
+                osc.connect(gain);
+                gain.connect(this.ctx.destination);
+                osc.type = 'sawtooth';
+                osc.frequency.setValueAtTime(freq, now + idx * 0.08);
+                gain.gain.setValueAtTime(0.12, now + idx * 0.08);
+                gain.gain.exponentialRampToValueAtTime(0.005, now + idx * 0.08 + 0.25);
+                osc.start(now + idx * 0.08);
+                osc.stop(now + idx * 0.08 + 0.25);
+            });
+        }
+    };
+
+    // --- Game Configuration & Data ---
+    const canvas = document.getElementById('slotCanvas');
+    const ctx = canvas.getContext('2d');
+
+    // Replace this with your deployed Google Apps Script Web App URL.
+    // Paste the deployed Google Apps Script WEB APP URL here. It must end in /exec.
+    const LEADERBOARD_API_URL = 'https://script.google.com/macros/s/AKfycbwCuRXK4dJ8VaiD25eDCfq62Tu1g_2tzjyFDJi8Hw7Vjlm5X6lena9pYtU8-9RVxR3Z9Q/exec';
+    const LEADERBOARD_LIMIT = 10;
+
+    let credits = 100; 
+    let currentBet = 1;
+    const minBet = 1;
+    const maxBet = 10;
+
+    // Adjusted payouts and weights to target ~150% average payback (RTP)
+    const symbolsConfig = [
+        { id: 'K', src: './K.jpg', payout: 5, weight: 180 },
+        { id: 'A', src: './A.jpg', payout: 10, weight: 165 },
+        { id: 'shirt', src: './shirt.jpg', payout: 15, weight: 140 },
+        { id: 'cigs', src: './cigs.jpg', payout: 20, weight: 125 },
+        { id: 'chew', src: './chew.jpg', payout: 25, weight: 110 },
+        { id: 'beer', src: './beer.jpg', payout: 35, weight: 90 },
+        { id: 'truck', src: './truck.jpg', payout: 50, weight: 70 },
+        { id: 'ogre', src: './ogre.jpg', payout: 0, isWild: true, weight: 120 } 
+    ];
+
+    const totalSymbolWeight = symbolsConfig.reduce((sum, sym) => sum + sym.weight, 0);
+
+    function getRandomSymbolId() {
+        let rand = Math.floor(Math.random() * totalSymbolWeight);
+        for (let i = 0; i < symbolsConfig.length; i++) {
+            if (rand < symbolsConfig[i].weight) {
+                return symbolsConfig[i].id;
+            }
+            rand -= symbolsConfig[i].weight;
+        }
+        return symbolsConfig[0].id;
+    }
+
+    const images = {};
+    let loadedImagesCount = 0;
+    const totalImages = symbolsConfig.length + 2;
+
+    const spriteWidth = 160;
+    const spriteHeight = 110;
+    let spriteSheetCanvas = null; 
+    const spriteMap = {};         
+
+    function preloadImage(key, src) {
+        images[key] = new Image();
+        images[key].src = src;
+        images[key].onload = () => {
+            loadedImagesCount++;
+            if (loadedImagesCount === totalImages) {
+                buildVirtualSpriteSheet();
+                initGame();
+            }
+        };
+        images[key].onerror = () => {
+            loadedImagesCount++; 
+            if (loadedImagesCount === totalImages) {
+                buildVirtualSpriteSheet();
+                initGame();
+            }
+        };
+    }
+
+    preloadImage('ui', './slot.jpg');
+    preloadImage('front', './slotfront.jpg');
+    symbolsConfig.forEach(sym => preloadImage(sym.id, sym.src));
+
+    function buildVirtualSpriteSheet() {
+        spriteSheetCanvas = document.createElement('canvas');
+        spriteSheetCanvas.width = spriteWidth * symbolsConfig.length;
+        spriteSheetCanvas.height = spriteHeight;
+        const sCtx = spriteSheetCanvas.getContext('2d');
+
+        symbolsConfig.forEach((sym, index) => {
+            const img = images[sym.id];
+            const posX = index * spriteWidth;
+            
+            if (img && img.complete && img.naturalWidth !== 0) {
+                sCtx.drawImage(img, posX, 0, spriteWidth, spriteHeight);
+            } else {
+                sCtx.fillStyle = "#3d2a1c";
+                sCtx.fillRect(posX, 0, spriteWidth, spriteHeight);
+                sCtx.fillStyle = "#fff";
+                sCtx.font = "bold 20px sans-serif";
+                sCtx.fillText(sym.id.toUpperCase(), posX + 20, spriteHeight / 2);
+            }
+            spriteMap[sym.id] = { x: posX, y: 0 };
+        });
+    }
+
+    const reelXPositions = [185, 370, 560]; 
+    const reelY = 137;         
+    const reelWidth = 160;     
+    const reelHeight = 330;    
+    const rowHeight = 110;     
+
+    let reels = [
+        { currentY: 0, symbols: ['K', 'A', 'shirt', 'truck', 'K'], startTime: 0, stopTimer: 0, stopStartTime: 0, stopDistance: 0, stopProgressMoved: 0, maxSpeed: 0, currentSpeed: 0, state: 'idle' },
+        { currentY: 0, symbols: ['beer', 'truck', 'ogre', 'K', 'A'], startTime: 0, stopTimer: 0, stopStartTime: 0, stopDistance: 0, stopProgressMoved: 0, maxSpeed: 0, currentSpeed: 0, state: 'idle' },
+        { currentY: 0, symbols: ['chew', 'cigs', 'K', 'A', 'shirt'], startTime: 0, stopTimer: 0, stopStartTime: 0, stopDistance: 0, stopProgressMoved: 0, maxSpeed: 0, currentSpeed: 0, state: 'idle' }
+    ];
+
+    let isSpinning = false;
+    let isRespin = false;
+    let winMessage = "";
+
+    function initGame() {
+        setupEventListeners();
+        drawEverything();
+        loadLeaderboard();
+    }
+
+    function setupEventListeners() {
+        document.getElementById('btn-bet-up').addEventListener('click', () => {
+            if (isSpinning || credits <= 0) return;
+            AudioEngine.playClick();
+            if (currentBet < maxBet) currentBet++;
+            drawEverything();
+        });
+
+        document.getElementById('btn-bet-down').addEventListener('click', () => {
+            if (isSpinning || credits <= 0) return;
+            AudioEngine.playClick();
+            if (currentBet > minBet) currentBet--;
+            drawEverything();
+        });
+
+        document.getElementById('btn-spin').addEventListener('click', () => {
+            if (isSpinning || credits < currentBet) return;
+            startSpin();
+        });
+
+        document.getElementById('btn-get-credits').addEventListener('click', () => {
+            AudioEngine.playClick();
+            credits += 100;
+            document.getElementById('creditsOverlay').classList.remove('active');
+            drawEverything();
+        });
+
+
+        document.getElementById('btn-cashout').addEventListener('click', openCashoutDialog);
+        document.getElementById('btn-cancel-cashout').addEventListener('click', closeCashoutDialog);
+        document.getElementById('btn-submit-cashout').addEventListener('click', submitCashout);
+    }
+
+    function startSpin() {
+        isSpinning = true;
+        isRespin = false;
+        credits -= currentBet;
+        winMessage = "";
+
+        AudioEngine.playClick();
+        AudioEngine.playSpin();
+
+        let now = performance.now();
+        reels.forEach((reel, idx) => {
+            reel.state = 'ease-in';
+            reel.startTime = now; 
+            reel.maxSpeed = 32; 
+            reel.currentSpeed = 0;
+            reel.currentY = 0;
+            reel.stopStartTime = 0;
+            reel.stopDistance = 0;
+            reel.stopProgressMoved = 0;
+            
+            reel.stopTimer = (idx === 0) ? (now + 700) : 0; 
+        });
+
+        requestAnimationFrame(updateReels);
+    }
+
+    function startRespin() {
+        isSpinning = true;
+        isRespin = true;
+        winMessage = "";
+
+        AudioEngine.playClick();
+        AudioEngine.playSpin();
+
+        let now = performance.now();
+        
+        // Lock the left reel (reel idx 0) in place since it contains the triggering wild
+        reels[0].state = 'idle';
+
+        // Spin middle and right reels
+        [1, 2].forEach((idx) => {
+            let reel = reels[idx];
+            reel.state = 'ease-in';
+            reel.startTime = now; 
+            reel.maxSpeed = 32; 
+            reel.currentSpeed = 0;
+            reel.currentY = 0;
+            reel.stopStartTime = 0;
+            reel.stopDistance = 0;
+            reel.stopProgressMoved = 0;
+            
+            reel.stopTimer = (idx === 1) ? (now + 700) : 0; 
+        });
+
+        requestAnimationFrame(updateReels);
+    }
+
+    function updateReels(timestamp) {
+        let allStopped = true;
+        const easeInDuration = 400;  
+        const easeOutDuration = 1000; 
+        const epsilon = 0.1; 
+
+        reels.forEach((reel, idx) => {
+            if (reel.state === 'ease-in') {
+                allStopped = false;
+                let elapsed = timestamp - reel.startTime;
+                if (elapsed >= easeInDuration) {
+                    reel.state = 'spinning';
+                    reel.currentSpeed = reel.maxSpeed;
+                } else {
+                    let progress = elapsed / easeInDuration;
+                    reel.currentSpeed = reel.maxSpeed * (progress * progress);
+                }
+                
+                reel.currentY += reel.currentSpeed;
+                if (reel.currentY >= rowHeight) {
+                    reel.currentY %= rowHeight;
+                    let randSym = getRandomSymbolId();
+                    reel.symbols.unshift(randSym);
+                    if (reel.symbols.length > 6) reel.symbols.pop();
+                }
+            } else if (reel.state === 'spinning') {
+                allStopped = false;
+                reel.currentY += reel.currentSpeed;
+
+                if (reel.currentY >= rowHeight) {
+                    reel.currentY %= rowHeight;
+                    let randSym = getRandomSymbolId();
+                    reel.symbols.unshift(randSym);
+                    if (reel.symbols.length > 6) reel.symbols.pop();
+                }
+
+                if (reel.stopTimer > 0 && timestamp >= reel.stopTimer) {
+                    reel.state = 'stopping';
+                }
+            } else if (reel.state === 'stopping') {
+                allStopped = false;
+                
+                if (reel.stopStartTime === 0) {
+                    reel.stopStartTime = timestamp;
+                    reel.stopDistance = (rowHeight - reel.currentY) + (rowHeight * 2);
+                    reel.stopProgressMoved = 0;
+                }
+
+                let elapsedStop = timestamp - reel.stopStartTime;
+                let progress = Math.min(1, elapsedStop / easeOutDuration);
+                
+                let easeOut = 1 - Math.pow(1 - progress, 3);
+                
+                let targetMoved = easeOut * reel.stopDistance;
+                let deltaY = targetMoved - reel.stopProgressMoved;
+                reel.stopProgressMoved = targetMoved;
+
+                reel.currentY += deltaY;
+
+                while (reel.currentY >= (rowHeight - epsilon)) {
+                    reel.currentY -= rowHeight;
+                    let randSym = getRandomSymbolId();
+                    reel.symbols.unshift(randSym);
+                    if (reel.symbols.length > 6) reel.symbols.pop();
+                }
+
+                if (progress >= 1) {
+                    reel.currentY = 0;
+                    reel.state = 'idle';
+                    AudioEngine.playStop();
+
+                    if (idx === 0) {
+                        reels[1].stopTimer = timestamp + 50;
+                    } else if (idx === 1) {
+                        reels[2].stopTimer = timestamp + 50;
+                    }
+                }
+            }
+        });
+
+        if (allStopped && isSpinning) {
+            isSpinning = false;
+            AudioEngine.stopSpin();
+            evaluateSpinResult();
+        }
+
+        drawEverything();
+
+        if (isSpinning || reels.some(r => r.state !== 'idle')) {
+            requestAnimationFrame(updateReels);
+        }
+    }
+
+    function evaluateSpinResult() {
+        let sym1 = reels[0].symbols[2];
+        let sym2 = reels[1].symbols[2];
+        let sym3 = reels[2].symbols[2];
+
+        let line = [sym1, sym2, sym3];
+        let ogreCount = line.filter(s => s === 'ogre').length;
+
+        let winAmount = 0;
+        let isWin = false;
+        let finalMultiplier = 0;
+
+        if (ogreCount === 3) {
+            finalMultiplier = 1500; // Updated matching the 150% paytable
+            winAmount = currentBet * finalMultiplier;
+            winMessage = `JACKPOT!! +${winAmount}`;
+            isWin = true;
+        } else {
+            let nonWilds = line.filter(s => s !== 'ogre');
+            let uniqueNonWilds = [...new Set(nonWilds)];
+
+            if (uniqueNonWilds.length <= 1) {
+                let winningSymId = uniqueNonWilds[0] || 'K'; 
+                let basePayout = symbolsConfig.find(s => s.id === winningSymId).payout;
+                
+                let wildMultiplier = 1;
+                if (ogreCount === 1) wildMultiplier = 2;
+                if (ogreCount === 2) wildMultiplier = 4;
+
+                finalMultiplier = basePayout * wildMultiplier;
+                winAmount = currentBet * finalMultiplier;
+                winMessage = `WIN! +${winAmount}`;
+                isWin = true;
+            }
+        }
+
+        if (isWin && winAmount > 0) {
+            credits += winAmount;
+            
+            if (finalMultiplier >= 60) {
+                // If it's a big win, play the big win track exclusively
+                AudioEngine.playBigWin();
+                
+                document.getElementById('bigwinDisplayAmount').innerText = `+${winAmount.toLocaleString()}`;
+                const bigwinOverlay = document.getElementById('bigwinOverlay');
+                bigwinOverlay.classList.add('active');
+                
+                setTimeout(() => {
+                    bigwinOverlay.classList.remove('active');
+                    if (credits <= 0) {
+                        document.getElementById('creditsOverlay').classList.add('active');
+                    }
+                }, 4000);
+            } else {
+                // Normal win audio checks
+                if (ogreCount >= 1) {
+                    AudioEngine.playOgreLanded();
+                } else {
+                    AudioEngine.playWin();
+                }
+            }
+            isRespin = false;
+        } else {
+            // No line win: Check if Ogre Respin condition is qualified
+            if (sym1 === 'ogre' && !isRespin) {
+                // Play respin vocal track audio
+                AudioEngine.playRespin();
+                
+                // Active graphic layout container popup
+                const respinOverlay = document.getElementById('respinOverlay');
+                respinOverlay.classList.add('active');
+                
+                setTimeout(() => {
+                    respinOverlay.classList.remove('active');
+                    startRespin();
+                }, 2000);
+                return;
+            }
+            isRespin = false;
+        }
+
+        if (credits <= 0 && finalMultiplier < 20) {
+            document.getElementById('creditsOverlay').classList.add('active');
+        }
+    }
+
+
+    function getLeaderboardApiUrl() {
+        return String(LEADERBOARD_API_URL || '').trim().replace(/\/$/, '');
+    }
+
+    function leaderboardConfigured() {
+        const url = getLeaderboardApiUrl();
+        return /^https:\/\/script\.google\.com\/macros\/s\/[^/]+\/exec$/i.test(url);
+    }
+
+    async function fetchWithTimeout(url, options = {}, timeoutMs = 15000) {
+        const controller = new AbortController();
+        const timer = setTimeout(() => controller.abort(), timeoutMs);
+        try {
+            return await fetch(url, {
+                ...options,
+                signal: controller.signal,
+                redirect: 'follow'
+            });
+        } finally {
+            clearTimeout(timer);
+        }
+    }
+
+    async function readJsonResponse(response) {
+        const rawText = await response.text();
+        if (!response.ok) {
+            throw new Error(`Server returned HTTP ${response.status}.`);
+        }
+        try {
+            return JSON.parse(rawText);
+        } catch (error) {
+            const preview = rawText.replace(/\s+/g, ' ').slice(0, 120);
+            throw new Error(`The Web App did not return JSON${preview ? `: ${preview}` : '.'}`);
+        }
+    }
+
+    function openCashoutDialog() {
+        if (isSpinning) return;
+        AudioEngine.playClick();
+        document.getElementById('cashoutCredits').textContent = credits.toLocaleString();
+        document.getElementById('cashoutStatus').textContent = '';
+        document.getElementById('cashoutOverlay').classList.add('active');
+        setTimeout(() => document.getElementById('cashoutName').focus(), 50);
+    }
+
+    function closeCashoutDialog() {
+        document.getElementById('cashoutOverlay').classList.remove('active');
+    }
+
+    async function submitCashout() {
+        const nameInput = document.getElementById('cashoutName');
+        const status = document.getElementById('cashoutStatus');
+        const submitBtn = document.getElementById('btn-submit-cashout');
+        const name = nameInput.value.trim().replace(/\s+/g, ' ');
+        const score = Math.max(0, Math.floor(credits));
+
+        if (!name || name.length < 2) {
+            status.textContent = 'Enter a name with at least 2 characters.';
+            return;
+        }
+        if (!leaderboardConfigured()) {
+            status.textContent = 'Paste your deployed Web App URL ending in /exec into LEADERBOARD_API_URL.';
+            return;
+        }
+
+        submitBtn.disabled = true;
+        status.textContent = 'Submitting...';
+        try {
+            const response = await fetchWithTimeout(getLeaderboardApiUrl(), {
+                method: 'POST',
+                mode: 'cors',
+                cache: 'no-store',
+                headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+                body: JSON.stringify({ action: 'submit', name, score })
+            });
+            const data = await readJsonResponse(response);
+            if (!data.ok) throw new Error(data.error || 'Submission failed.');
+
+            credits = 0;
+            currentBet = minBet;
+            winMessage = `CASHED OUT ${score.toLocaleString()}`;
+            nameInput.value = '';
+            closeCashoutDialog();
+            drawEverything();
+            await loadLeaderboard();
+        } catch (error) {
+            const detail = error.name === 'AbortError'
+                ? 'The request timed out.'
+                : error.message;
+            status.textContent = `Could not submit: ${detail}`;
+        } finally {
+            submitBtn.disabled = false;
+        }
+    }
+
+    async function loadLeaderboard() {
+        const status = document.getElementById('leaderboardStatus');
+        const list = document.getElementById('leaderboardList');
+        if (!leaderboardConfigured()) {
+            status.textContent = 'Set LEADERBOARD_API_URL to your deployed Google Apps Script URL ending in /exec.';
+            list.innerHTML = '';
+            return;
+        }
+
+        status.textContent = 'Connecting to global leaderboard...';
+        list.innerHTML = '';
+        try {
+            const separator = getLeaderboardApiUrl().includes('?') ? '&' : '?';
+            const url = `${getLeaderboardApiUrl()}${separator}action=leaderboard&limit=${LEADERBOARD_LIMIT}&t=${Date.now()}`;
+            const response = await fetchWithTimeout(url, {
+                method: 'GET',
+                mode: 'cors',
+                cache: 'no-store'
+            });
+            const data = await readJsonResponse(response);
+            if (!data.ok) throw new Error(data.error || 'Could not load scores.');
+
+            const scores = Array.isArray(data.scores) ? data.scores : [];
+            scores.forEach((entry, index) => {
+                const row = document.createElement('div');
+                row.className = 'leaderboard-entry';
+
+                const rank = document.createElement('div');
+                rank.className = 'leaderboard-rank';
+                rank.textContent = `#${index + 1}`;
+
+                const playerName = document.createElement('div');
+                playerName.className = 'leaderboard-name';
+                playerName.textContent = String(entry.name || 'Anonymous');
+
+                const playerScore = document.createElement('div');
+                playerScore.className = 'leaderboard-score';
+                playerScore.textContent = Number(entry.score || 0).toLocaleString();
+
+                row.append(rank, playerName, playerScore);
+                list.appendChild(row);
+            });
+            status.textContent = scores.length ? 'Global leaderboard connected.' : 'Connected. No cashouts yet—be the first!';
+        } catch (error) {
+            const detail = error.name === 'AbortError'
+                ? 'Connection timed out.'
+                : error.message;
+            status.textContent = `Leaderboard unavailable: ${detail} Check that deployment access is set to Anyone and the URL ends in /exec.`;
+            list.innerHTML = '';
+        }
+    }
+
+    function drawEverything() {
+        ctx.fillStyle = "#ffffff";
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+        if (images['ui'] && images['ui'].complete && images['ui'].naturalWidth !== 0) {
+            ctx.drawImage(images['ui'], 0, 0, canvas.width, canvas.height);
+        }
+
+        reels.forEach((reel, idx) => {
+            ctx.save();
+            ctx.beginPath();
+            ctx.rect(reelXPositions[idx], reelY, reelWidth, reelHeight);
+            ctx.clip();
+
+            for (let i = 0; i < reel.symbols.length; i++) {
+                let symId = reel.symbols[i];
+                let drawY = reelY + (i - 1) * rowHeight + reel.currentY;
+                let drawX = reelXPositions[idx];
+                
+                if (spriteSheetCanvas && spriteMap[symId]) {
+                    let sourceCoords = spriteMap[symId];
+                    ctx.drawImage(
+                        spriteSheetCanvas, 
+                        sourceCoords.x, sourceCoords.y, spriteWidth, spriteHeight, 
+                        drawX, drawY, reelWidth, rowHeight                        
+                    );
+                } else {
+                    ctx.fillStyle = "#1a120b";
+                    ctx.font = "bold 24px sans-serif";
+                    ctx.textAlign = "center";
+                    ctx.fillText(symId.toUpperCase(), reelXPositions[idx] + reelWidth/2, drawY + rowHeight/2 + 8);
+                }
+            }
+            ctx.restore();
+        });
+
+        if (images['front'] && images['front'].complete && images['front'].naturalWidth !== 0) {
+            ctx.drawImage(images['front'], 0, 0, canvas.width, canvas.height);
+        }
+
+        ctx.fillStyle = "#ffffff"; 
+        ctx.shadowColor = "rgba(0, 0, 0, 1)";
+        ctx.shadowBlur = 4;
+
+        ctx.font = "bold 28px sans-serif";
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle"; 
+        
+        ctx.fillText(credits.toLocaleString(), 207, 549);
+        ctx.fillText(currentBet, 459, 549);
+
+        ctx.textBaseline = "alphabetic";
+
+        if (winMessage !== "") {
+            ctx.fillStyle = "#ffd700";
+            ctx.font = "bold 40px sans-serif";
+            ctx.fillText(winMessage, 450, 105);
+        }
+    }
+</script>
+
+</body>
+</html>
